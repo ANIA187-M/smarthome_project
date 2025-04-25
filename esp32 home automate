@@ -1,0 +1,116 @@
+// Inclure les bibliothèques nécessaires
+#include <Arduino.h>
+#include <ESP32Servo.h>
+#include "BluetoothSerial.h"
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+// Configuration des broches
+const int pinVentilateur = 25;  // Broche de contrôle du ventilateur
+const int pinCapteurTemp = 35;  // Broche de lecture du capteur de température
+const int servoDOOR = 4;
+#define Led1 5
+#define Led2 18
+String recv = "";
+//Configuration de la plage de température
+const float seuilTemperature = 15.0;  // Seuil de température pour activer le ventilateur
+BluetoothSerial SerialBT;
+// Broches du capteur HC-SR04
+const int trigPin = 2;  // Broche de déclenchement (Trig)
+const int echoPin = 15;  // Broche de réception (Echo)
+// Broche de sortie PWM pour le signal du servomoteur
+const int servoPin = 32;
+ 
+// Variables pour le servomoteur et la distance de détection
+Servo servo;
+Servo doorServo;
+
+int distanceThreshold = 10;  // Seuil de distance de détection en centimètres
+bool isOpen = false;         // État actuel de la poubelle (ouverte ou fermée)
+
+void setup() {
+  // Initialisation de la communication série
+    Serial.begin(115200);
+  pinMode(Led1, OUTPUT);
+  pinMode(Led2, OUTPUT);
+  pinMode(servoDOOR, OUTPUT);
+  SerialBT.begin("ESP32_HOME_Control"); //Bluetooth device name
+  Serial.println("The device started, now you can pair it with bluetooth!");
+  pinMode(pinVentilateur, OUTPUT);  // Configurez la broche du ventilateur en sortie
+  pinMode(pinCapteurTemp, INPUT);  // Configurez la broche du capteur de température en entrée
+  
+  isOpen = false; // Initialise isOpen à false
+  // Configuration des broches du capteur HC-SR04
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  
+//Attacher l'objet de servo a la bronche correspondante
+servo.attach(servoPin);
+doorServo.attach(servoDOOR); 
+
+}
+
+void loop() {
+   while (SerialBT.available()) // Read until the bluetooth client is sending.
+  {char string = SerialBT.read();
+    recv = recv + string;
+    delay(1); }
+  if (recv == "ONLAMPE1") { digitalWrite(Led1, HIGH); }
+  if (recv == "OFFLAMPE1"){digitalWrite(Led1,LOW);}
+  if (recv == "ONLAMPE2"){digitalWrite(Led2, HIGH);}
+  if (recv == "OFFLAMPE2"){digitalWrite(Led2,LOW);}
+  if (recv == "OUVRIR"){doorServo.write(180);}
+  if (recv == "FERMER"){doorServo.write(0);}
+  
+  recv = ""; // clearing the string.
+  // Déclencher une impulsion ultrasonique
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // Mesurer la durée de l'impulsion réfléchie
+  long duration = pulseIn(echoPin, HIGH);
+
+  // Calculer la distance en fonction de la durée de l'impulsion
+  int distance = duration * 0.034 / 2;
+
+  // Vérifier si la main est à proximité de la poubelle
+  if (distance < distanceThreshold) {
+    // Si la poubelle est fermée, l'ouvrir
+    if (!isOpen) {
+      servo.write(0);
+      delay(4500);
+      isOpen = true;
+      
+    } } else {
+    // Si la poubelle est ouverte, la fermer
+    if (isOpen) {
+      servo.write(180);
+      isOpen = false;
+      delay(50);
+    }
+  } 
+  // Lecture de la tension du capteur de température LM35
+  int lecture = analogRead(pinCapteurTemp);
+  float tension = (lecture * 3.3) / 4095.0;  // Convertir la lecture en tension (3.3V pour ESP32)
+
+  // Conversion de la tension en température en degrés Celsius
+  float temperature = tension * 100.0;
+
+  // Affichage de la température
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.println(" °C");
+
+  // Activation ou désactivation du ventilateur en fonction de la température
+  if (temperature > seuilTemperature) {
+    // Activer le ventilateur 
+    
+    analogWrite(pinVentilateur, HIGH);
+  } else {
+    // Désactiver le ventilateur
+    analogWrite(pinVentilateur, LOW);}
+ delay(1000); }
