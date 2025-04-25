@@ -56,10 +56,23 @@ void loop() {
   {char string = SerialBT.read();
     recv = recv + string;
     delay(1); }
-  if (recv == "ONLAMPE1") { digitalWrite(Led1, HIGH); }
-  if (recv == "OFFLAMPE1"){digitalWrite(Led1,LOW);}
-  if (recv == "ONLAMPE2"){digitalWrite(Led2, HIGH);}
-  if (recv == "OFFLAMPE2"){digitalWrite(Led2,LOW);}
+  if (recv == "ON/offlampe1") { switch(etatLed1){
+   case LOW : etatLed1= HIGH;
+   break;
+   case HIGH : etatLed1= LOW;
+   break;
+    } digitalWrite(Led1, etatLed1)}
+  if (recv == "ON/offlampe2") { switch(etatLed2){
+   case LOW : etatLed2= HIGH;
+   break;
+   case HIGH : etatLed2= LOW;
+   break;
+    } digitalWrite(Led2, etatLed2)}
+  if (recv == "OFFALL"){digitalWrite(Led1,LOW);
+      digitalWrite(Led2,LOW);}
+  if (recv == "ONALL2"){digitalWrite(Led2, HIGH);
+     digitalWrite(Led1,HIGH);}
+  
   if (recv == "OUVRIR"){doorServo.write(180);}
   if (recv == "FERMER"){doorServo.write(0);}
   
